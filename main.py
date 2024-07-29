@@ -5,15 +5,10 @@ import datetime
 import sqlite3
 import asyncio
 import io
-import os
-from dotenv import load_dotenv
 
 from nextcord.ext import commands, tasks
 from nextcord.ui import View
 from PIL import Image
-
-# Load environment variables
-load_dotenv()
 
 # CONFIGURABLE VARIABLES
 
@@ -93,7 +88,7 @@ async def on_guild_join(guild: nextcord.Guild):
 async def on_message(message: nextcord.Message):
     guild = BOT.get_guild(GUILD_ID)
     perm_role = nextcord.utils.get(guild.roles, name=ADMIN_ROLE_NAME)
-    staff_role = nextcord.utils.get(guild.roles, name=STAFF_ROLE_NAME)
+    perm_role = nextcord.utils.get(guild.roles, name=STAFF_ROLE_NAME)
 
     if message.author != BOT.user and message.content != None and message.author.bot == False:
         guild = BOT.get_guild(GUILD_ID)
@@ -123,7 +118,7 @@ async def on_message(message: nextcord.Message):
                                 modmail_channel = await category.create_text_channel(name=f"{message.author.id}")
                                 for guilds in BOT.guilds:
                                     view = ModMailButtonInside(guilds.owner_id)
-                                send = await modmail_channel.send(f"❗| {staff_role.mention}\nnew modmail from {message.author.mention} - <t:{int(datetime.datetime.now().timestamp())}:R>\n{message.content}", file=discord_file, view=view)
+                                send = await modmail_channel.send(f"❗| {perm_role.mention}\nnew modmail from {message.author.mention} - <t:{int(datetime.datetime.now().timestamp())}:R>\n{message.content}", file=discord_file, view=view)
                                 await send.pin()
                                 await message.author.send(f'✅ | sent, you are now connected to modmail - <t:{int(datetime.datetime.now().timestamp())}:R>\n{message.content}')
                                 await message.add_reaction('✅')
@@ -131,7 +126,7 @@ async def on_message(message: nextcord.Message):
                         modmail_channel = await category.create_text_channel(name=f"{message.author.id}")
                         for guilds in BOT.guilds:
                             view = ModMailButtonInside(guilds.owner_id)
-                        send = await modmail_channel.send(f"❗| {staff_role.mention}\nnew modmail from {message.author.mention} - <t:{int(datetime.datetime.now().timestamp())}:R>\n{message.content}", view=view)
+                        send = await modmail_channel.send(f"❗| {perm_role.mention}\nnew modmail from {message.author.mention} - <t:{int(datetime.datetime.now().timestamp())}:R>\n{message.content}", view=view)
                         await send.pin()
                         await message.author.send(f'✅ | sent, you are now connected to modmail - <t:{int(datetime.datetime.now().timestamp())}:R>\n{message.content}')
                         await message.add_reaction('✅')
@@ -226,7 +221,7 @@ async def ping(interaction: nextcord.Interaction):
 
 @BOT.slash_command(guild_ids=[GUILD_ID], description='create/delete a ticket')
 async def ticket(interaction: nextcord.Interaction, action: str = nextcord.SlashOption(required=True, choices=['create', 'delete']), reason: str = nextcord.SlashOption(required=True)):
-    support_role = nextcord.utils.get(interaction.guild.roles, name=STAFF_ROLE_NAME)
+    perm_role = nextcord.utils.get(interaction.guild.roles, name=STAFF_ROLE_NAME)
     category = BOT.get_channel(TICKET_CATEGORY_ID)
     CUR.execute("SELECT * FROM ticket_blacklist WHERE member_id=?", (interaction.user.id,))
     if_blacklisted = CUR.fetchone()
@@ -240,14 +235,14 @@ async def ticket(interaction: nextcord.Interaction, action: str = nextcord.Slash
                             await response.edit(f'❌ | a ticket already exists for you\nticket: {channel.mention}')
                             return
                     overwrites = {
-                        support_role: nextcord.PermissionOverwrite(read_messages=True),
+                        perm_role: nextcord.PermissionOverwrite(read_messages=True),
                         interaction.guild.default_role: nextcord.PermissionOverwrite(read_messages=False),
                         interaction.user: nextcord.PermissionOverwrite(read_messages=True, embed_links=True, attach_files=True)
                     }
                     ticket_channel = await interaction.guild.create_text_channel(f'ticket-{interaction.user.id}', category=category, overwrites=overwrites)
                     for guild in BOT.guilds:
                         view = TicketButtonInside(guild.owner_id)
-                    send = await ticket_channel.send(f"❗| welcome to your ticket, {interaction.user.mention}! {support_role.mention} will be here shortly.\nreason: {reason}", view=view)
+                    send = await ticket_channel.send(f"❗| welcome to your ticket, {interaction.user.mention}! {perm_role.mention} will be here shortly.\nreason: {reason}", view=view)
                     await send.pin()
                     await response.edit(f'✅ | your ticket has been created\n{ticket_channel.mention}')
                 except Exception as e:
@@ -256,8 +251,8 @@ async def ticket(interaction: nextcord.Interaction, action: str = nextcord.Slash
                 await response.edit(f'❌ | your ticket couldnt be created\nreason: {if_blacklisted[1]}')
         elif action == 'delete':
             member_highest_role = interaction.user.top_role
-            if not member_highest_role >= support_role:
-                await interaction.response.send_message(f'❌ | you dont have permissions (‎♡‧₊˚staff role or higher)', ephemeral=True)
+            if not member_highest_role >= perm_role:
+                await interaction.response.send_message(f'❌ | you dont have permission', ephemeral=True)
                 return
             try:
                 if interaction.channel.name.startswith("ticket-"):
@@ -276,7 +271,7 @@ async def ticketbuttoncreator(interaction: nextcord.Interaction):
     perm_role = nextcord.utils.get(interaction.guild.roles, name=ADMIN_ROLE_NAME)
     member_highest_role = interaction.user.top_role
     if not member_highest_role >= perm_role:
-        await interaction.response.send_message(f'❌ | you dont have permissions ({ADMIN_ROLE_NAME} role or higher)', ephemeral=True)
+        await interaction.response.send_message(f'❌ | you dont have permission', ephemeral=True)
         return
     
     for guilds in BOT.guilds:
@@ -290,7 +285,7 @@ async def modmail(interaction: nextcord.Interaction, action: str = nextcord.Slas
     perm_role = nextcord.utils.get(interaction.guild.roles, name=STAFF_ROLE_NAME)
     member_highest_role = interaction.user.top_role
     if not member_highest_role >= perm_role:
-        await interaction.response.send_message(f'❌ | you dont have permissions ({STAFF_ROLE_NAME} role or higher)', ephemeral=True)
+        await interaction.response.send_message(f'❌ | you dont have permission', ephemeral=True)
         return
     
     category = BOT.get_channel(MODMAIL_CATEGORY_ID)
@@ -300,8 +295,6 @@ async def modmail(interaction: nextcord.Interaction, action: str = nextcord.Slas
             response = await interaction.response.send_message(f'🕛 | opening... (if hasnt changed then something went wrong)', ephemeral=True)
             dm_existing_channel = nextcord.utils.get(category.channels, name=f'{member.id}')
             if not dm_existing_channel:
-                if not member:
-                    await response.edit(f'❌ | cannot force a connection to modmail with no one')
                 try:
                     try:
                         await member.send(f'✅ | you have been forced a connection to modmail with {interaction.user.mention} - <t:{int(datetime.datetime.now().timestamp())}:R>')
@@ -312,7 +305,7 @@ async def modmail(interaction: nextcord.Interaction, action: str = nextcord.Slas
                     await modmail_channel.send(f"✅ | you have forced a connection to modmail with {member.mention} - <t:{int(datetime.datetime.now().timestamp())}:R>")
                     await response.edit(f'✅ | modmail opened\n{modmail_channel.mention}')
                 except:
-                    await interaction.response.send_message(f'❌ | couldnt force modmail connection', ephemeral=True)
+                    await interaction.response.send_message(f'❌ | couldnt force modmail connection or couldnt force modmail connection with no one', ephemeral=True)
             else:
                 await interaction.response.send_message(f'❌ | this modmail connection already exists', ephemeral=True)
         elif action == 'close':
@@ -336,12 +329,11 @@ async def blacklist(interaction: nextcord.Interaction, type: str = nextcord.Slas
     perm_role = nextcord.utils.get(interaction.guild.roles, name=ADMIN_ROLE_NAME)
     member_highest_role = interaction.user.top_role
     if not member_highest_role >= perm_role:
-        await interaction.response.send_message(f'❌ | you dont have permissions ({ADMIN_ROLE_NAME} role or higher)', ephemeral=True)
+        await interaction.response.send_message(f'❌ | you dont have permission', ephemeral=True)
         return
     
-    staff_role = nextcord.utils.get(member.guild.roles, name=STAFF_ROLE_NAME)
-    
-    if staff_role in member.roles or member.id == interaction.user.id:
+    safe_role = nextcord.utils.get(member.guild.roles, name=STAFF_ROLE_NAME)
+    if safe_role in member.roles or member.id == interaction.user.id:
         await interaction.response.send_message("❌ | you cannot blacklist a staff member or yourself", ephemeral=True)
         return
     
@@ -442,9 +434,9 @@ class TicketButtonInside(View):
     @nextcord.ui.button(label='delete ticket', style=nextcord.ButtonStyle.secondary, custom_id="ticketbuttondeleter")
     async def button_callback(self, button: nextcord.Button, interaction: nextcord.Interaction):
         if button.custom_id == "ticketbuttondeleter":
-            support_role = nextcord.utils.get(interaction.guild.roles, name=STAFF_ROLE_NAME)
+            perm_role = nextcord.utils.get(interaction.guild.roles, name=STAFF_ROLE_NAME)
             member_highest_role = interaction.user.top_role
-            if not member_highest_role >= support_role:
+            if not member_highest_role >= perm_role:
                 await interaction.response.send_message(f'❌ | you dont have permission', ephemeral=True)
                 return
             for guilds in BOT.guilds:
@@ -549,9 +541,9 @@ class ModMailButtonInside(View):
     @nextcord.ui.button(label='delete modmail', style=nextcord.ButtonStyle.secondary, custom_id="modmailbuttondeleter")
     async def button_callback(self, button: nextcord.Button, interaction: nextcord.Interaction):
         if button.custom_id == "modmailbuttondeleter":
-            support_role = nextcord.utils.get(interaction.guild.roles, name=STAFF_ROLE_NAME)
+            perm_role = nextcord.utils.get(interaction.guild.roles, name=STAFF_ROLE_NAME)
             member_highest_role = interaction.user.top_role
-            if not member_highest_role >= support_role:
+            if not member_highest_role >= perm_role:
                 await interaction.response.send_message(f'❌ | you dont have permission', ephemeral=True)
                 return
             for guilds in BOT.guilds:
